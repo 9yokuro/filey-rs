@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use serde::{Serialize, Deserialize};
 
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum UnitOfInfo {
@@ -19,7 +19,7 @@ impl fmt::Display for UnitOfInfo {
             Self::GiB => write!(f, "GiB"),
             Self::TiB => write!(f, "TiB"),
             Self::PiB => write!(f, "PiB"),
-            Self::EiB => write!(f, "EiB")
+            Self::EiB => write!(f, "EiB"),
         }
     }
 }

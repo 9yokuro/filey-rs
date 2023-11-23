@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        file_types::FileTypes,
-        file_operations::Filey,
-    };
+    use crate::{file_operations::Filey, file_types::FileTypes};
     use std::fs;
     #[test]
     fn it_works() {

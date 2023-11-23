@@ -1,6 +1,6 @@
-use std::{fmt, path::Path};
-use serde::{Serialize, Deserialize};
 use crate::Error::NotFound;
+use serde::{Deserialize, Serialize};
+use std::{fmt, path::Path};
 
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum FileTypes {
@@ -43,7 +43,9 @@ impl FileTypes {
                 Ok(Self::File)
             }
         } else {
-            Err(NotFound { path: path.as_ref().display().to_string() })?
+            Err(NotFound {
+                path: path.as_ref().display().to_string(),
+            })?
         }
     }
 }

@@ -1,13 +1,13 @@
+use crate::file_types::FileTypes;
+use crate::unit_of_information::UnitOfInfo;
+use crate::Error::{FileyError, NotADirectory};
+use path_absolutize::Absolutize;
 use std::{
-    fmt,
     env::var,
+    fmt,
     fs::{metadata, read_dir, remove_dir_all, remove_file, rename},
     path::{Path, PathBuf},
 };
-use path_absolutize::Absolutize;
-use crate::unit_of_information::UnitOfInfo;
-use crate::file_types::FileTypes;
-use crate::Error::{NotADirectory, FileyError};
 
 #[derive(Clone)]
 pub struct Filey {
@@ -61,7 +61,10 @@ impl Filey {
             let number_of_files = self.list()?.len();
             Ok(number_of_files as u64)
         } else {
-            let size = metadata(&self.path).map_err(|e| e.into()).map_err(FileyError)?.len();
+            let size = metadata(&self.path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?
+                .len();
             Ok(size)
         }
     }
@@ -125,11 +128,7 @@ impl Filey {
     /// assert_eq!(directory.file_name().unwrap().as_str(), "src");
     /// ```
     pub fn file_name(&self) -> Option<String> {
-        let name = self
-            .path
-            .file_name()?
-            .to_string_lossy()
-            .to_string();
+        let name = self.path.file_name()?.to_string_lossy().to_string();
         Some(name)
     }
 
@@ -144,11 +143,7 @@ impl Filey {
     /// assert_eq!(file.file_stem().unwrap().as_str(), "lib");
     /// ```
     pub fn file_stem(&self) -> Option<String> {
-        let stem = self
-            .path
-            .file_stem()?
-            .to_string_lossy()
-            .to_string();
+        let stem = self.path.file_stem()?.to_string_lossy().to_string();
         Some(stem)
     }
 
@@ -168,10 +163,7 @@ impl Filey {
     ///     "src");
     /// ```
     pub fn parent_dir(&self) -> Option<PathBuf> {
-        let parent_dir = self
-            .path
-            .parent()?
-            .to_path_buf();
+        let parent_dir = self.path.parent()?.to_path_buf();
         Some(parent_dir)
     }
 
@@ -196,7 +188,12 @@ impl Filey {
     ///     "/home/Tom/src/lib.rs");
     /// ```
     pub fn absolutized(&self) -> Result<PathBuf, crate::Error> {
-        let path = self.expand_user()?.absolutize().map_err(|e| e.into()).map_err(FileyError)?.to_path_buf();
+        let path = self
+            .expand_user()?
+            .absolutize()
+            .map_err(|e| e.into())
+            .map_err(FileyError)?
+            .to_path_buf();
         Ok(path)
     }
 
@@ -220,7 +217,11 @@ impl Filey {
     ///     "/home/Lisa/dotfiles/nvim/init.lua");
     /// ```
     pub fn canonicalized(&self) -> Result<PathBuf, crate::Error> {
-        let path = self.path.canonicalize().map_err(|e| e.into()).map_err(FileyError)?;
+        let path = self
+            .path
+            .canonicalize()
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
         Ok(path)
     }
 
@@ -301,10 +302,19 @@ impl Filey {
         match FileTypes::which(&path).unwrap_or_else(|_| self.file_type().unwrap()) {
             FileTypes::Directory => {
                 let p = path.as_ref().display().to_string();
-                let to = format!("{}/{}", p, self.file_name().unwrap_or_else(|| self.path.to_string_lossy().to_string()));
-                rename(&self.path, to).map_err(|e| e.into()).map_err(FileyError)?;
+                let to = format!(
+                    "{}/{}",
+                    p,
+                    self.file_name()
+                        .unwrap_or_else(|| self.path.to_string_lossy().to_string())
+                );
+                rename(&self.path, to)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?;
             }
-            _ => rename(&self.path, path).map_err(|e| e.into()).map_err(FileyError)?,
+            _ => rename(&self.path, path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
         }
         Ok(())
     }
@@ -326,8 +336,12 @@ impl Filey {
     /// ```
     pub fn remove(&self) -> Result<(), crate::Error> {
         match self.file_type()? {
-            FileTypes::Directory => remove_dir_all(&self.path).map_err(|e| e.into()).map_err(FileyError)?,
-            _ => remove_file(&self.path).map_err(|e| e.into()).map_err(FileyError)?,
+            FileTypes::Directory => remove_dir_all(&self.path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
+            _ => remove_file(&self.path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
         }
         Ok(())
     }
@@ -360,10 +374,15 @@ impl Filey {
     /// ```
     pub fn list(&self) -> Result<Vec<PathBuf>, crate::Error> {
         if self.file_type()? != FileTypes::Directory {
-            Err(NotADirectory { path: self.path.to_string_lossy().to_string() })?
+            Err(NotADirectory {
+                path: self.path.to_string_lossy().to_string(),
+            })?
         } else {
             let mut v = vec![];
-            for i in read_dir(&self.path).map_err(|e| e.into()).map_err(FileyError)? {
+            for i in read_dir(&self.path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?
+            {
                 let p = i.map_err(|e| e.into()).map_err(FileyError)?.path();
                 v.push(p)
             }
