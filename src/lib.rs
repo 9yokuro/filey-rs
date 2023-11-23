@@ -1,5 +1,5 @@
 //! # filey
-//! 'filey' is a collection of utilities to make file operaions more convenient.
+//! 'filey' is a collection of utilities to make file operations more convenient.
 //!
 //! This library is made up of three main components:
 //!
