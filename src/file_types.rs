@@ -1,6 +1,6 @@
 use std::{fmt, path::Path};
 use serde::{Serialize, Deserialize};
-use anyhow::{Result, bail};
+use crate::Error::NotFound;
 
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum FileTypes {
@@ -32,7 +32,7 @@ impl FileTypes {
     /// assert_eq!(FileTypes::which("src/lib.rs").unwrap(), FileTypes::File);
     /// assert_eq!(FileTypes::which("src/").unwrap(), FileTypes::Directory);
     /// ```
-    pub fn which<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn which<P: AsRef<Path>>(path: P) -> Result<Self, crate::Error> {
         let p: &Path = path.as_ref();
         if p.exists() {
             if p.is_dir() {
@@ -43,7 +43,7 @@ impl FileTypes {
                 Ok(Self::File)
             }
         } else {
-            bail!("file-operations-rs::FileTypes::which: '{}' No such file or directory", p.to_string_lossy().to_string())
+            Err(NotFound { path: path.as_ref().display().to_string() })?
         }
     }
 }
