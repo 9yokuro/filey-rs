@@ -1,9 +1,9 @@
-//! # fpop
-//! 'fpop' is a collection of utilities to make file operaions more convenient.
+//! # filey
+//! 'filey' is a collection of utilities to make file operaions more convenient.
 //!
 //! This library is made up of three main components:
 //!
-//! - [`FileOperations`]: the main struct.
+//! - [`Filey`]: the main struct.
 //! - [`UnitOfInfo`]: make unit convertion easier.
 //! - [`FileTypes`]: make treating file types easier.
 
@@ -14,6 +14,7 @@ mod unit_of_information;
 
 pub use crate::{file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo};
 
+/// Filey's error type.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub enum Error {

@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// The main struct.
 #[derive(Clone)]
 pub struct Filey {
     path: PathBuf,
@@ -51,10 +52,17 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::Filey;
-    ///
-    /// let size = Filey::new("install.sh").size().unwrap();
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_size() -> Result<(), Box<Error>> {
+    /// let size = Filey::new("install.sh").size()?;
     /// println!("{}", size); // 1079
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_size().unwrap();
+    /// # }
     /// ```
     pub fn size(&self) -> Result<u64, crate::Error> {
         if self.file_type()? == FileTypes::Directory {
@@ -78,10 +86,17 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::Filey;
-    ///
-    /// let size_styled = Filey::new("great.rs").size_styled().unwrap();
+    /// # use filey::Filey;
+    /// # std::error::Error;
+    /// #
+    /// # fn get_size_styled() -> Result<(), Box<Error>> {
+    /// let size_styled = Filey::new("great.rs").size_styled()?;
     /// println!("{}", size_styled); // 20GiB
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_size_styled().unwrap();
+    /// # }
     /// ```
     pub fn size_styled(&self) -> Result<String, crate::Error> {
         if self.file_type()? == FileTypes::Directory {
@@ -119,13 +134,19 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// #
+    /// # fn get_file_name() -> Option<String> {
     /// let file = Filey::new("src/lib.rs");
-    /// assert_eq!(file.file_name().unwrap().as_str(), "lib.rs");
+    /// assert_eq!(file.file_name()?.as_str(), "lib.rs");
     ///
     /// let directory = Filey::new("src/lib.rs");
-    /// assert_eq!(directory.file_name().unwrap().as_str(), "src");
+    /// assert_eq!(directory.file_name()?.as_str(), "src");
+    /// # Some(directory.to_string())
+    /// # }
+    /// # fn main() {
+    /// # get_file_name().unwrap();
+    /// # }
     /// ```
     pub fn file_name(&self) -> Option<String> {
         let name = self.path.file_name()?.to_string_lossy().to_string();
@@ -137,10 +158,17 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_file_stem() -> Option<String> {
     /// let file = Filey::new("src/lib.rs");
-    /// assert_eq!(file.file_stem().unwrap().as_str(), "lib");
+    /// assert_eq!(file.file_stem()?.as_str(), "lib");
+    /// # Some(file.to_string())
+    /// # }
+    /// # fn main() {
+    /// # get_file_stem().unwrap();
+    /// # }
     /// ```
     pub fn file_stem(&self) -> Option<String> {
         let stem = self.path.file_stem()?.to_string_lossy().to_string();
@@ -152,15 +180,20 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// #
+    /// # fn get_parent_dir() -> Option<PathBuf> {
     /// let file = Filey::new("src/lib.rs");
-    /// assert_eq!(file.parent_dir()
-    ///     .unwrap()
+    /// assert_eq!(file.parent_dir()?
     ///     .to_string_lossy()
     ///     .to_string()
     ///     .as_str(),
     ///     "src");
+    /// # Some(file.path())
+    /// # }
+    /// # fn main() {
+    /// # get_parent_dir().unwrap();
+    /// # }
     /// ```
     pub fn parent_dir(&self) -> Option<PathBuf> {
         let parent_dir = self.path.parent()?.to_path_buf();
@@ -177,24 +210,31 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_absoluzed() -> Result<(), Box<Error>> {
     /// let file = Filey::new("src/lib.rs");
-    /// assert_eq!(file.absolutized()
-    ///     .unwrap()
-    ///     .to_string_lossy()
+    /// assert_eq!(file.absolutized()?
     ///     .to_string()
     ///     .as_str(),
     ///     "/home/Tom/src/lib.rs");
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_absoluzed().unwrap();
+    /// # }
     /// ```
-    pub fn absolutized(&self) -> Result<PathBuf, crate::Error> {
+    pub fn absolutized(&self) -> Result<Self, crate::Error> {
         let path = self
             .expand_user()?
+            .path
             .absolutize()
             .map_err(|e| e.into())
             .map_err(FileyError)?
             .to_path_buf();
-        Ok(path)
+        let filey = Filey::new(path);
+        Ok(filey)
     }
 
     /// Return the canonicalized(absolutized and symbolic links solved) path.
@@ -205,24 +245,30 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_canonicalized() -> Result<(), Box<Error>> {
     /// // nvim/init.lua -> /home/Lisa/dotfiles/nvim/init.lua
     /// let file = Filey::new("nvim/init.lua");
-    /// assert_eq!(file.canonicalized()
-    ///     .unwrap()
-    ///     .to_string_lossy()
+    /// assert_eq!(file.canonicalized()?
     ///     .to_string()
     ///     .as_str(),
     ///     "/home/Lisa/dotfiles/nvim/init.lua");
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_canonicalized().unwrap();
+    /// # }
     /// ```
-    pub fn canonicalized(&self) -> Result<PathBuf, crate::Error> {
+    pub fn canonicalized(&self) -> Result<Self, crate::Error> {
         let path = self
             .path
             .canonicalize()
             .map_err(|e| e.into())
             .map_err(FileyError)?;
-        Ok(path)
+        let filey = Filey::new(path);
+        Ok(filey)
     }
 
     /// Replaces an initial tilde of the path by the environment variable HOME.
@@ -235,24 +281,30 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_expanded() -> Result<(), Box<Error>> {
     /// let directory = Filey::new("~/audio");
-    /// assert_eq!(directory.expand_user()
-    ///     .unwrap()
-    ///     .to_string_lossy()
+    /// assert_eq!(directory.expand_user()?
     ///     .to_string()
     ///     .as_str(),
     ///     "/home/Mike/audio");
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_expanded().unwrap();
+    /// # }
     /// ```
-    pub fn expand_user(&self) -> Result<PathBuf, crate::Error> {
+    pub fn expand_user(&self) -> Result<Self, crate::Error> {
         let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
         let s = &self.path.to_string_lossy().to_string();
         if s.starts_with('~') {
             let p = s.replacen('~', &home_dir, 1);
-            Ok(Path::new(&p).to_path_buf())
+            let filey = Filey::new(&p);
+            Ok(filey)
         } else {
-            Ok(self.path.to_path_buf())
+            Ok(self.clone())
         }
     }
 
@@ -266,10 +318,17 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::*;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn get_closed() -> Result<(), Box<Error>> {
     /// let file = Filey::new("/home/Meg/cats.png");
-    /// assert_eq!(file.close_user().unwrap().as_str(), "~/cats.png")
+    /// assert_eq!(file.close_user()?.as_str(), "~/cats.png")
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # get_closed().unwrap();
+    /// # }
     /// ```
     pub fn close_user(&self) -> Result<String, crate::Error> {
         let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
@@ -286,19 +345,28 @@ impl Filey {
     ///
     /// # Errors
     /// * The user lacks permissions.
-    /// * self.path and path: P are on separate filesystems.
+    /// * from(Filey) and to(path: P) are on separate filesystems.
+    ///
+    /// # Panics
+    /// * Both from and to don't exist.
     ///
     /// # Examples
     /// ```
-    /// use std::path::Path;
-    /// use fpop_rs::Filey;
-    /// use fpop_rs::FileTypes;
-    ///
-    /// let file = Filey::new("cats.png").create(FileTypes::File).unwrap();
-    /// file.move_to("photos/animals/").unwrap();
+    /// # use std::path::Path;
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn moves() -> Result<(), Box<Error>> {
+    /// let file = Filey::new("cats.png");
+    /// file.move_to("photos/animals/")?;
     /// assert_eq!(Path::new("photos/animals/cats.png").exists(), true);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # moves().unwrap();
+    /// # }
     /// ```
-    pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::Error> {
+    pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<Self, crate::Error> {
         match FileTypes::which(&path).unwrap_or_else(|_| self.file_type().unwrap()) {
             FileTypes::Directory => {
                 let p = path.as_ref().display().to_string();
@@ -306,17 +374,22 @@ impl Filey {
                     "{}/{}",
                     p,
                     self.file_name()
-                        .unwrap_or_else(|| self.path.to_string_lossy().to_string())
+                        .unwrap_or_else(|| self.to_string())
                 );
-                rename(&self.path, to)
+                rename(&self.path, &to)
                     .map_err(|e| e.into())
                     .map_err(FileyError)?;
+                let filey = Filey::new(&to);
+                Ok(filey)
             }
-            _ => rename(&self.path, path)
+            _ => {
+                rename(&self.path, &path)
                 .map_err(|e| e.into())
-                .map_err(FileyError)?,
+                .map_err(FileyError)?;
+                let filey = Filey::new(&path);
+                Ok(filey)
+            }
         }
-        Ok(())
     }
 
     /// Judge the type of a file and remove the file.
@@ -327,12 +400,18 @@ impl Filey {
     ///  
     /// # Examples
     /// ```
-    /// use fpop_rs::Filey;
-    /// use fpop_rs::FileTypes;
-    ///
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// #
+    /// # fn rm() -> Result<(), Box<Error>> {
     /// let file = Filey::new("coredump");
-    /// file.remove().unwrap();
+    /// file.remove()?;
     /// assert_eq!(file.exists(), false);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # rm().unwrap();
+    /// # }
     /// ```
     pub fn remove(&self) -> Result<(), crate::Error> {
         match self.file_type()? {
@@ -359,9 +438,10 @@ impl Filey {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::Filey;
-    ///
-    /// let v = Filey::new("src/").list().unwarp();
+    /// # use filey::Filey;
+    /// # use std::error::Error;
+    /// # fn ls() -> Result<(), Box<Error>> {
+    /// let v = Filey::new("src/").list()?;
     /// for i in v {
     ///     let s = i.to_string_lossy().to_string();
     ///     println!("{}", s)
@@ -371,6 +451,11 @@ impl Filey {
     /// // src/ui.rs
     /// // src/draw.rs
     /// // src/errors.rs
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # ls().unwrap();
+    /// # }
     /// ```
     pub fn list(&self) -> Result<Vec<PathBuf>, crate::Error> {
         if self.file_type()? != FileTypes::Directory {

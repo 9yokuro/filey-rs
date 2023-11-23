@@ -2,6 +2,7 @@ use crate::Error::NotFound;
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path};
 
+/// Kinds of files.
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum FileTypes {
     File,
@@ -27,10 +28,20 @@ impl FileTypes {
     ///
     /// # Examples
     /// ```
-    /// use fpop_rs::FileTypes;
+    /// # use filey::FileTypes;
+    /// # use std::error::Error;
+    /// #
+    /// # fn kind() -> Result<(), Box<Error>> {
+    /// let file = "src/lib.rs";
+    /// println!(FileTypes::which(file)?); // file
     ///
-    /// assert_eq!(FileTypes::which("src/lib.rs").unwrap(), FileTypes::File);
-    /// assert_eq!(FileTypes::which("src/").unwrap(), FileTypes::Directory);
+    /// let directory = "src";
+    /// println!(FileTypes::which(directory)?); // directory
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # kind().unwrap();
+    /// # }
     /// ```
     pub fn which<P: AsRef<Path>>(path: P) -> Result<Self, crate::Error> {
         let p: &Path = path.as_ref();

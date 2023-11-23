@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Units derived from bit.
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum UnitOfInfo {
     KiB,
