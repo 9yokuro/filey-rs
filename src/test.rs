@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::{file_operations::Filey, file_types::FileTypes};
+    use crate::{
+        catenate, create, remove, file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo,
+    };
     use std::fs::File;
     #[test]
     fn it_works() {
@@ -27,25 +29,16 @@ mod tests {
             "test"
         );
         assert_eq!(
-            f.absolutized()
-                .unwrap()
-                .to_string()
-                .as_str(),
+            f.absolutized().unwrap().to_string().as_str(),
             "/home/p14/code/filey/test/test.txt"
         );
         let f2 = Filey::new("~/code/filey/test/test.txt");
         assert_eq!(
-            f.absolutized()
-                .unwrap()
-                .to_string()
-                .as_str(),
+            f.absolutized().unwrap().to_string().as_str(),
             "/home/p14/code/filey/test/test.txt"
         );
         assert_eq!(
-            f2.expand_user()
-                .unwrap()
-                .to_string()
-                .as_str(),
+            f2.expand_user().unwrap().to_string().as_str(),
             "/home/p14/code/filey/test/test.txt"
         );
         let f3 = Filey::new("/home/p14/code/filey/test/test.txt");
@@ -63,5 +56,23 @@ mod tests {
         f.remove().unwrap();
         assert_eq!(f.exists(), false);
         File::create(&f.path()).unwrap();
+        assert_eq!(
+            UnitOfInfo::convert(1073741824, UnitOfInfo::MiB) as u64,
+            1024
+        );
+        assert_eq!(UnitOfInfo::format(1024).as_str(), "1KiB");
+        assert_eq!(UnitOfInfo::format(1048576).as_str(), "1MiB");
+        assert_eq!(UnitOfInfo::format(1073741824).as_str(), "1GiB");
+        assert_eq!(UnitOfInfo::format(1099511627776).as_str(), "1TiB");
+        assert_eq!(UnitOfInfo::format(1125899906842624).as_str(), "1PiB");
+        assert_eq!(UnitOfInfo::format(1152921504606846976).as_str(), "1EiB");
+        let s = catenate!(
+            "src/unit_of_information.rs",
+            "src/file_operations.rs"
+        );
+        create!(FileTypes::File, "a.txt", "b.txt", "c.txt");
+        create!(FileTypes::Directory, "d", "e", "f");
+        remove!("a.txt", "b.txt", "c.txt", "d", "e", "f");
+        println!("{}", s);
     }
 }

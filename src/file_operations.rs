@@ -1,11 +1,12 @@
 use crate::file_types::FileTypes;
 use crate::unit_of_information::UnitOfInfo;
-use crate::Error::{FileyError, NotADirectory};
+use crate::Error::{FileyError, NotADirectory, AlreadyExists};
 use path_absolutize::Absolutize;
 use std::{
     env::var,
     fmt,
-    fs::{metadata, read_dir, remove_dir_all, remove_file, rename},
+    fs::{create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File, copy},
+    os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
 
@@ -104,28 +105,7 @@ impl Filey {
             Ok(number_of_files.to_string())
         } else {
             let n = self.size()?;
-            let digit = n.to_string().chars().collect::<Vec<char>>().len();
-            if (4..7).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::KiB));
-                Ok(format!("{}{}", m, UnitOfInfo::KiB))
-            } else if (7..11).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::MiB));
-                Ok(format!("{}{}", m, UnitOfInfo::MiB))
-            } else if (11..15).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::GiB));
-                Ok(format!("{}{}", m, UnitOfInfo::GiB))
-            } else if (15..19).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::TiB));
-                Ok(format!("{}{}", m, UnitOfInfo::TiB))
-            } else if (19..23).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::PiB));
-                Ok(format!("{}{}", m, UnitOfInfo::PiB))
-            } else if (23..27).contains(&digit) {
-                let m = round_size(UnitOfInfo::convert(n, UnitOfInfo::EiB));
-                Ok(format!("{}{}", m, UnitOfInfo::EiB))
-            } else {
-                Ok(format!("{}B", n))
-            }
+            Ok(UnitOfInfo::format(n))
         }
     }
 
@@ -301,7 +281,7 @@ impl Filey {
         let s = &self.path.to_string_lossy().to_string();
         if s.starts_with('~') {
             let p = s.replacen('~', &home_dir, 1);
-            let filey = Filey::new(&p);
+            let filey = Filey::new(p);
             Ok(filey)
         } else {
             Ok(self.clone())
@@ -367,28 +347,28 @@ impl Filey {
     /// # }
     /// ```
     pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<Self, crate::Error> {
-        match FileTypes::which(&path).unwrap_or_else(|_| self.file_type().unwrap()) {
-            FileTypes::Directory => {
+        if path.as_ref().exists() {
+            if let FileTypes::Directory = FileTypes::which(&path)? {
                 let p = path.as_ref().display().to_string();
                 let to = format!(
                     "{}/{}",
                     p,
-                    self.file_name()
-                        .unwrap_or_else(|| self.to_string())
+                    self.file_name().unwrap_or_else(|| self.to_string())
                 );
                 rename(&self.path, &to)
                     .map_err(|e| e.into())
                     .map_err(FileyError)?;
                 let filey = Filey::new(&to);
                 Ok(filey)
+            } else {
+                Err(AlreadyExists { path: path.as_ref().display().to_string() })
             }
-            _ => {
+        } else {
                 rename(&self.path, &path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?;
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?;
                 let filey = Filey::new(&path);
                 Ok(filey)
-            }
         }
     }
 
@@ -422,6 +402,72 @@ impl Filey {
                 .map_err(|e| e.into())
                 .map_err(FileyError)?,
         }
+        Ok(())
+    }
+
+    /// Create a new file or directory.
+    ///
+    /// # Examples
+    /// ```
+    /// # use filey::{Filey, FileTypes};
+    /// # use std::error::Error;
+    /// #
+    /// # fn touch() -> Result<(), Box<Error> {
+    /// let directory = File::new("photo/dogs").create(FileTypes::Directory)?;
+    /// assert_eq!(directory.exists(), true);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # touch().unwrap();
+    /// # }
+    /// ```
+    pub fn create(&self, file_type: FileTypes) -> Result<Self, crate::Error> {
+        match file_type {
+            FileTypes::File => {
+                File::create(&self.path)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?;
+            }
+            FileTypes::Directory => create_dir_all(&self.path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
+            FileTypes::Symlink => (),
+        }
+        Ok(self.clone())
+    }
+
+    /// Copy the contents of file to another.
+    pub fn copy<P: AsRef<Path>>(&self, path: P) -> Result<Self, crate::Error> {
+        copy(&self.path, &path).map_err(|e| e.into()).map_err(FileyError)?;
+        let filey = Filey::new(path);
+        Ok(filey)
+    }
+
+    /// (Unix only) Create a new symbolic link on the filesystem.
+    ///
+    /// # Examples
+    /// ```
+    /// # use filey::{Filey, FileTypes};
+    /// # use std::path::Path;
+    /// # use std::error::Error;
+    /// #
+    /// # fn create_symlink() -> Result<(), Box<Error> {
+    /// let vimrc_dotfiles = Filey::new("~/dotfiles/vimrc");
+    /// vimrc_dotfiles.create(FileTypes::File).symlink("~/.vimrc")?;
+    /// assert_eq!(Path::new("~/.vimrc").exists(), true);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # create_symlink().unwrap();
+    /// # }
+    /// ```
+    #[cfg(target_family = "unix")]
+    pub fn symlink<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::Error> {
+        let original = &self.absolutized()?.path;
+        let link = Filey::new(path).absolutized()?.path;
+        symlink(original, link)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
         Ok(())
     }
 
@@ -476,6 +522,90 @@ impl Filey {
     }
 }
 
-fn round_size(n: f64) -> u64 {
-    n.round() as u64
+/// Concatenates file(s) to String.
+///
+/// # Examples
+/// ```
+/// # use filey::{Filey, catenate};
+/// # use std::error::Error;
+/// # use std::fs;
+/// #
+/// # fn cat() -> Result<(), Box<Error>> {
+/// fs::write("h.rs", "fn main {")?;
+/// fs::write("el.rs", r#"    println!("Hello, World!");"#)?;
+/// fs::write("lo.rs", "}")?;
+///
+/// let s = catenate!("h.rs", "el.rs", "lo.rs");
+/// println!("{}", s);
+/// // fn main() {
+/// //     println!("Hello, World!");
+/// // }
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// # cat().unwrap();
+/// # }
+/// ```
+#[macro_export]
+macro_rules! catenate {
+    ( $( $path:expr ),* ) => {
+        {
+            use std::{io::Read, path::Path, fs::File};
+
+            let mut buffer = String::new();
+            $(
+                if Path::new($path).is_file() {
+                let mut s = String::new();
+                let mut f = File::open($path).unwrap();
+                f.read_to_string(&mut s).unwrap();
+                buffer.push_str(&s);
+                buffer.push('\n');
+                }
+            )*
+            buffer
+        }
+    }
+}
+
+/// Creates file(s) or directory(s).
+///
+/// # Examples
+/// ```
+/// # use filey::{Filey, FileTypes, create};
+/// #
+/// create!(FileTypes::File, "src/draw_ui.rs", "src/app_state.rs", "run.rs");
+/// ```
+#[macro_export]
+macro_rules! create {
+    ( $file_type:expr $(, $path:expr )* $(,)?) => {
+        {
+            $(
+                let f = Filey::new($path);
+                if !f.exists() {
+                    f.create($file_type).unwrap();
+                }
+            )*
+        }
+    }
+}
+
+/// Removes file(s) or directory(s).
+///
+/// # Examples
+/// ```
+/// # use filey::{Filey, remove};
+/// remove!("old_dir", "unnecessary.jpg");
+/// ```
+#[macro_export]
+macro_rules! remove {
+    ( $( $path:expr ), *) => {
+        {
+            $(
+                let f = Filey::new($path);
+                if f.exists() {
+                    f.remove().unwrap();
+                }
+            )*
+        }
+    }
 }

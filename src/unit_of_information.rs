@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Units derived from bit.
-#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Eq)]
 pub enum UnitOfInfo {
     KiB,
     MiB,
@@ -41,7 +41,7 @@ impl From<UnitOfInfo> for u64 {
 impl UnitOfInfo {
     /// # Examples
     /// ```
-    /// use fpop_rs::UnitOfInfo;
+    /// use filey::UnitOfInfo;
     ///
     /// let n: u64 = UnitOfInfo::GiB.into();
     /// // convert 1GiB to 1,024MiB.
@@ -50,4 +50,31 @@ impl UnitOfInfo {
         let m: u64 = u.into();
         (n / m) as f64
     }
+
+    pub fn format(n: u64) -> String {
+        let m = digit(n);
+        if (4..7).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::KiB)), Self::KiB)
+        } else if (7..10).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::MiB)), Self::MiB)
+        } else if (10..13).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::GiB)), Self::GiB)
+        } else if (13..16).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::TiB)), Self::TiB)
+        } else if (16..19).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::PiB)), Self::PiB)
+        } else if (19..22).contains(&m) {
+            format!("{}{}", round(Self::convert(n, Self::EiB)), Self::EiB)
+        } else {
+            format!("{}B", n)
+        }
+    }
+}
+
+fn round(n: f64) -> u64 {
+    n.round() as u64
+}
+
+fn digit(n: u64) -> u64 {
+    n.to_string().chars().collect::<Vec<char>>().len() as u64
 }

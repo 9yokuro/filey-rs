@@ -6,6 +6,31 @@
 //! - [`Filey`]: the main struct.
 //! - [`UnitOfInfo`]: make unit convertion easier.
 //! - [`FileTypes`]: make treating file types easier.
+//!
+//! # A Basic example
+//! ```
+//! use filey::Filey;
+//! # use std::error::Error;
+//! #
+//! # fn examples() -> Result<(), Box<Error>> {
+//! use filey::{Filey, FileTypes};
+//!
+//! // Create a new file.
+//! let file = Filey::new(".great_app.conf").create(FileTypes::File)?;
+//!
+//! // Two months later...
+//! let file_size = file.size_styled()?;
+//! println!("{}", file_size); // 17MiB
+//!
+//! let dotfile = file.move_to("dotfiles/")?;
+//! 
+//! dotfile.symlink(".great_app.conf")?;
+//! # Ok(())
+//! # }
+//! # fn main() {
+//! # examples().unwrap();
+//! # }
+//! ```
 
 mod file_operations;
 mod file_types;
@@ -26,5 +51,9 @@ pub enum Error {
     #[error("{} is not a directory", path)]
     NotADirectory {
         path: String,
+    },
+    #[error("{} already exists", path)]
+    AlreadyExists{
+        path: String
     },
 }

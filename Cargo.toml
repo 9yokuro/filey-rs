@@ -12,7 +12,6 @@ edition = "2021"
 anyhow = { version = "1.0.75", features = ["std", "backtrace"] }
 path-absolutize = "3.1.1"
 serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
 thiserror = "1.0.50"
 
 [lib]
