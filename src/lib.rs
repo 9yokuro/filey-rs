@@ -34,10 +34,11 @@
 
 mod file_operations;
 mod file_types;
-mod test;
 mod unit_of_information;
+mod macros;
+mod test;
 
-pub use crate::{file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo};
+pub use crate::{file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo, macros::*};
 
 /// Filey's error type.
 #[derive(Debug, thiserror::Error)]
