@@ -27,6 +27,7 @@ impl Write for Filey {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let f = OpenOptions::new()
             .write(true)
+            .create(true)
             .open(&self.path)?;
         let mut writer = BufWriter::new(f);
         let n = writer.write(buf)?;

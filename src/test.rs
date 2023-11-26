@@ -75,7 +75,7 @@ mod tests {
         create!(FileTypes::Directory, "d", "e", "f");
         remove!("a.txt", "b.txt", "c.txt", "d", "e", "f");
         println!("{}", s);
-        let mut file = Filey::new("kiss.txt").create(FileTypes::File).unwrap();
+        let mut file = Filey::new("kiss.txt");
         file.write(b"Keep it simple, stupid.").unwrap();
         let mut buffer = String::new();
         let mut reader = File::open("kiss.txt").unwrap();
