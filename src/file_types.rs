@@ -43,7 +43,7 @@ impl FileTypes {
     /// # kind().unwrap();
     /// # }
     /// ```
-    pub fn which<P: AsRef<Path>>(path: P) -> Result<Self, crate::Error> {
+    pub fn which<P: AsRef<Path>>(path: P) -> crate::Result<Self> {
         let p: &Path = path.as_ref();
         if p.exists() {
             if p.is_dir() {
