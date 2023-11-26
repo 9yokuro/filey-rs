@@ -3,6 +3,7 @@ mod tests {
     use crate::{
         catenate, create, remove, file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo,
     };
+    use std::io::{Read, Write};
     use std::fs::File;
     #[test]
     fn it_works() {
@@ -74,5 +75,12 @@ mod tests {
         create!(FileTypes::Directory, "d", "e", "f");
         remove!("a.txt", "b.txt", "c.txt", "d", "e", "f");
         println!("{}", s);
+        let mut file = Filey::new("kiss.txt").create(FileTypes::File).unwrap();
+        file.write(b"Keep it simple, stupid.").unwrap();
+        let mut buffer = String::new();
+        let mut reader = File::open("kiss.txt").unwrap();
+        reader.read_to_string(&mut buffer).unwrap();
+        println!("{}", buffer);
+        file.remove().unwrap();
     }
 }

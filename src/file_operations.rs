@@ -3,9 +3,10 @@ use crate::unit_of_information::UnitOfInfo;
 use crate::Error::{FileyError, NotADirectory, AlreadyExists};
 use path_absolutize::Absolutize;
 use std::{
+    io::{self, Write, BufWriter},
     env::var,
     fmt,
-    fs::{create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File, copy},
+    fs::{create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File, copy, OpenOptions},
     os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
@@ -19,6 +20,26 @@ pub struct Filey {
 impl fmt::Display for Filey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.path.to_string_lossy())
+    }
+}
+
+impl Write for Filey {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let f = OpenOptions::new()
+            .write(true)
+            .open(&self.path)?;
+        let mut writer = BufWriter::new(f);
+        let n = writer.write(buf)?;
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let f = OpenOptions::new()
+            .write(true)
+            .open(&self.path)?;
+        let mut writer = BufWriter::new(f);
+        writer.flush()?;
+        Ok(())
     }
 }
 
