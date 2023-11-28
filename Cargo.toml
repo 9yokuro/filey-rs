@@ -5,6 +5,7 @@ authors = ["p1486 xzstd099@protonmail.com"]
 description = "A collection of utilities to make file operations more convenient."
 license = "MIT OR Apache-2.0"
 edition = "2021"
+repository = "https://github.com/p1486/filey-rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
