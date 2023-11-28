@@ -53,9 +53,7 @@ impl UnitOfInfo {
 
     pub fn format(n: u64) -> String {
         let m = n.to_string().chars().collect::<Vec<char>>().len() as u64;
-        let round = |n: f64| {
-            n.round() as u64
-        };
+        let round = |n: f64| n.round() as u64;
         if (4..7).contains(&m) {
             format!("{}{}", round(Self::convert(n, Self::KiB)), Self::KiB)
         } else if (7..10).contains(&m) {

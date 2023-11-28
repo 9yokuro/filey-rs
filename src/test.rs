@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        catenate, create, remove, file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo,
+        catenate, create, file_operations::Filey, file_types::FileTypes, remove,
+        unit_of_information::UnitOfInfo,
     };
-    use std::io::{Read, Write};
     use std::fs::File;
+    use std::io::{Read, Write};
     #[test]
     fn it_works() {
         assert_eq!(FileTypes::which("test").unwrap(), FileTypes::Directory);
@@ -67,10 +68,7 @@ mod tests {
         assert_eq!(UnitOfInfo::format(1099511627776).as_str(), "1TiB");
         assert_eq!(UnitOfInfo::format(1125899906842624).as_str(), "1PiB");
         assert_eq!(UnitOfInfo::format(1152921504606846976).as_str(), "1EiB");
-        let s = catenate!(
-            "src/unit_of_information.rs",
-            "src/file_operations.rs"
-        );
+        let s = catenate!("src/unit_of_information.rs", "src/file_operations.rs");
         create!(FileTypes::File, "a.txt", "b.txt", "c.txt");
         create!(FileTypes::Directory, "d", "e", "f");
         remove!("a.txt", "b.txt", "c.txt", "d", "e", "f");

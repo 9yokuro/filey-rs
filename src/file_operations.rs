@@ -1,12 +1,18 @@
-use crate::file_types::FileTypes;
-use crate::unit_of_information::UnitOfInfo;
-use crate::Error::{FileyError, NotADirectory, AlreadyExists};
+use crate::{
+    file_types::FileTypes,
+    unit_of_information::UnitOfInfo,
+    Error::{AlreadyExists, FileyError, NotADirectory, SameNameAlreadyExists},
+    Result,
+};
 use path_absolutize::Absolutize;
 use std::{
-    io::{self, Write, BufWriter},
     env::var,
     fmt,
-    fs::{create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File, copy, OpenOptions},
+    fs::{
+        copy, create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File,
+        OpenOptions,
+    },
+    io::{self, BufWriter, Write},
     os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
@@ -35,9 +41,7 @@ impl Write for Filey {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        let f = OpenOptions::new()
-            .write(true)
-            .open(&self.path)?;
+        let f = OpenOptions::new().write(true).open(&self.path)?;
         let mut writer = BufWriter::new(f);
         writer.flush()?;
         Ok(())
@@ -53,15 +57,15 @@ impl Filey {
     }
 
     /// Returns path to the file.
-    pub fn path(&self) -> PathBuf {
-        self.path.to_path_buf()
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
 
     /// Returns type of the file.
     ///
     /// # Errors
     /// * The file doesn't exist.
-    pub fn file_type(&self) -> crate::Result<FileTypes> {
+    pub fn file_type(&self) -> Result<FileTypes> {
         let file_type = FileTypes::which(&self.path)?;
         Ok(file_type)
     }
@@ -87,7 +91,7 @@ impl Filey {
     /// # get_size().unwrap();
     /// # }
     /// ```
-    pub fn size(&self) -> crate::Result<u64> {
+    pub fn size(&self) -> Result<u64> {
         if self.file_type()? == FileTypes::Directory {
             let number_of_files = self.list()?.len();
             Ok(number_of_files as u64)
@@ -121,7 +125,7 @@ impl Filey {
     /// # get_size_styled().unwrap();
     /// # }
     /// ```
-    pub fn size_styled(&self) -> crate::Result<String> {
+    pub fn size_styled(&self) -> Result<String> {
         if self.file_type()? == FileTypes::Directory {
             let number_of_files = self.list()?.len();
             Ok(number_of_files.to_string())
@@ -227,7 +231,7 @@ impl Filey {
     /// # get_absoluzed().unwrap();
     /// # }
     /// ```
-    pub fn absolutized(&self) -> crate::Result<Self> {
+    pub fn absolutized(&self) -> Result<Self> {
         let path = self
             .expand_user()?
             .path
@@ -263,7 +267,7 @@ impl Filey {
     /// # get_canonicalized().unwrap();
     /// # }
     /// ```
-    pub fn canonicalized(&self) -> crate::Result<Self> {
+    pub fn canonicalized(&self) -> Result<Self> {
         let path = self
             .path
             .canonicalize()
@@ -298,7 +302,7 @@ impl Filey {
     /// # get_expanded().unwrap();
     /// # }
     /// ```
-    pub fn expand_user(&self) -> crate::Result<Self> {
+    pub fn expand_user(&self) -> Result<Self> {
         let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
         let s = &self.path.to_string_lossy().to_string();
         if s.starts_with('~') {
@@ -332,7 +336,7 @@ impl Filey {
     /// # get_closed().unwrap();
     /// # }
     /// ```
-    pub fn close_user(&self) -> crate::Result<String> {
+    pub fn close_user(&self) -> Result<String> {
         let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
         let s = self.path.to_string_lossy().to_string();
         if s.starts_with(&home_dir) {
@@ -368,7 +372,7 @@ impl Filey {
     /// # moves().unwrap();
     /// # }
     /// ```
-    pub fn move_to<P: AsRef<Path>>(&self, path: P) -> crate::Result<Self> {
+    pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<Self> {
         if path.as_ref().exists() {
             if let FileTypes::Directory = FileTypes::which(&path)? {
                 let p = path.as_ref().display().to_string();
@@ -377,20 +381,30 @@ impl Filey {
                     p,
                     self.file_name().unwrap_or_else(|| self.to_string())
                 );
-                rename(&self.path, &to)
-                    .map_err(|e| e.into())
-                    .map_err(FileyError)?;
-                let filey = Filey::new(&to);
-                Ok(filey)
+                if Path::new(&to).exists() {
+                    Err(SameNameAlreadyExists { path: to })
+                } else {
+                    rename(&self.path, &to)
+                        .map_err(|e| e.into())
+                        .map_err(FileyError)?;
+                    let filey = Filey::new(&to);
+                    Ok(filey)
+                }
             } else {
-                Err(AlreadyExists { path: path.as_ref().display().to_string() })
+                Err(AlreadyExists {
+                    path: path.as_ref().display().to_string(),
+                })
             }
+        } else if path.as_ref().exists() {
+            Err(SameNameAlreadyExists {
+                path: path.as_ref().display().to_string(),
+            })
         } else {
-                rename(&self.path, &path)
-                    .map_err(|e| e.into())
-                    .map_err(FileyError)?;
-                let filey = Filey::new(&path);
-                Ok(filey)
+            rename(&self.path, &path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?;
+            let filey = Filey::new(&path);
+            Ok(filey)
         }
     }
 
@@ -415,7 +429,7 @@ impl Filey {
     /// # rm().unwrap();
     /// # }
     /// ```
-    pub fn remove(&self) -> crate::Result<()> {
+    pub fn remove(&self) -> Result<()> {
         match self.file_type()? {
             FileTypes::Directory => remove_dir_all(&self.path)
                 .map_err(|e| e.into())
@@ -443,7 +457,7 @@ impl Filey {
     /// # touch().unwrap();
     /// # }
     /// ```
-    pub fn create(&self, file_type: FileTypes) -> crate::Result<Self> {
+    pub fn create(&self, file_type: FileTypes) -> Result<Self> {
         match file_type {
             FileTypes::File => {
                 File::create(&self.path)
@@ -459,8 +473,10 @@ impl Filey {
     }
 
     /// Copy the contents of file to another.
-    pub fn copy<P: AsRef<Path>>(&self, path: P) -> crate::Result<Self> {
-        copy(&self.path, &path).map_err(|e| e.into()).map_err(FileyError)?;
+    pub fn copy<P: AsRef<Path>>(&self, path: P) -> Result<Self> {
+        copy(&self.path, &path)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
         let filey = Filey::new(path);
         Ok(filey)
     }
@@ -484,7 +500,7 @@ impl Filey {
     /// # }
     /// ```
     #[cfg(target_family = "unix")]
-    pub fn symlink<P: AsRef<Path>>(&self, path: P) -> crate::Result<()> {
+    pub fn symlink<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let original = &self.absolutized()?.path;
         let link = Filey::new(path).absolutized()?.path;
         symlink(original, link)
@@ -495,6 +511,18 @@ impl Filey {
 
     pub fn exists(&self) -> bool {
         self.path.exists()
+    }
+
+    pub fn is_file(&self) -> bool {
+        self.path.is_file()
+    }
+
+    pub fn is_dir(&self) -> bool {
+        self.path.is_dir()
+    }
+
+    pub fn is_symlink(&self) -> bool {
+        self.path.is_symlink()
     }
 
     /// Returns a list of files in the directory.
@@ -525,7 +553,7 @@ impl Filey {
     /// # ls().unwrap();
     /// # }
     /// ```
-    pub fn list(&self) -> crate::Result<Vec<PathBuf>> {
+    pub fn list(&self) -> Result<Vec<PathBuf>> {
         if self.file_type()? != FileTypes::Directory {
             Err(NotADirectory {
                 path: self.path.to_string_lossy().to_string(),

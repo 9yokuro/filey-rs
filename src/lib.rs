@@ -23,7 +23,7 @@
 //! println!("{}", file_size); // 17MiB
 //!
 //! let dotfile = file.move_to("dotfiles/")?;
-//! 
+//!
 //! dotfile.symlink(".great_app.conf")?;
 //! # Ok(())
 //! # }
@@ -34,28 +34,34 @@
 
 mod file_operations;
 mod file_types;
-mod unit_of_information;
 mod macros;
 mod test;
+mod unit_of_information;
 
-pub use crate::{file_operations::Filey, file_types::FileTypes, unit_of_information::UnitOfInfo, macros::*};
+pub use crate::{
+    file_operations::Filey, file_types::FileTypes, macros::*, unit_of_information::UnitOfInfo,
+};
 
 /// Filey's error type.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub enum Error {
     FileyError(anyhow::Error),
-    #[error("{} No such file or directory", path)]
+    #[error("'{}' No such file or directory", path)]
     NotFound {
         path: String,
     },
-    #[error("{} is not a directory", path)]
+    #[error("'{}' is not a directory", path)]
     NotADirectory {
         path: String,
     },
-    #[error("{} already exists", path)]
-    AlreadyExists{
-        path: String
+    #[error("'{}' already exists", path)]
+    AlreadyExists {
+        path: String,
+    },
+    #[error("'{}' file with the same name already exists", path)]
+    SameNameAlreadyExists {
+        path: String,
     },
 }
 
