@@ -7,6 +7,7 @@ use crate::{
 use path_absolutize::Absolutize;
 use std::{
     env::var,
+    convert::AsRef,
     fmt,
     fs::{
         copy, create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File,
@@ -26,6 +27,13 @@ pub struct Filey {
 impl fmt::Display for Filey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.path.to_string_lossy())
+    }
+}
+
+impl AsRef<Path> for Filey {
+    fn as_ref(&self) -> &Path {
+        let path: &Path = &self.path.as_ref();
+        path
     }
 }
 
