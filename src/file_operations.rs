@@ -603,20 +603,24 @@ impl Filey {
     pub fn list(&self) -> Result<Vec<PathBuf>> {
         if let Some(filetype) = self.file_type() {
             if let FileTypes::Directory = filetype {
-            let mut v = vec![];
-            for i in read_dir(&self.path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?
-            {
-                let p = i.map_err(|e| e.into()).map_err(FileyError)?.path();
-                v.push(p)
-            }
-            Ok(v)
+                let mut v = vec![];
+                for i in read_dir(&self.path)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?
+                {
+                    let p = i.map_err(|e| e.into()).map_err(FileyError)?.path();
+                    v.push(p)
+                }
+                Ok(v)
             } else {
-                Err(NotADirectory { path: self.to_string() })
+                Err(NotADirectory {
+                    path: self.to_string(),
+                })
             }
         } else {
-            Err(NotFound { path: self.to_string() })
+            Err(NotFound {
+                path: self.to_string(),
+            })
         }
     }
 }
