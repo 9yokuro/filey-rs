@@ -450,12 +450,8 @@ impl Filey {
                     .map_err(|e| e.into())
                     .map_err(FileyError)?
             }
-            Ok(())
-        } else {
-            Err(NotFound {
-                path: self.to_string(),
-            })
         }
+        Ok(())
     }
 
     /// Create a new file or directory.
