@@ -10,7 +10,7 @@ use std::{
     fmt,
     fs::{
         copy, create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File,
-        OpenOptions,
+        OpenOptions, hard_link,
     },
     io::{self, BufWriter, Write},
     os::unix::fs::symlink,
@@ -506,6 +506,34 @@ impl Filey {
         symlink(original, link)
             .map_err(|e| e.into())
             .map_err(FileyError)?;
+        Ok(())
+    }
+
+    /// Create a new hard link on the filesystem.
+    ///
+    /// # Errors
+    /// The original path is not a file or doesn't exist.
+    ///
+    /// # Examples
+    /// ```
+    /// # use filey::{Filey, FileTypes};
+    /// # use std::path::Path;
+    /// # use std::error::Error;
+    /// #
+    /// # fn create_hard_link() -> Result<(), Box<Error> {
+    /// let file = Filey::new("foo.txt");
+    /// file.create(FileTypes::File).hard_link("bar.txt")?;
+    /// assert_eq!(Path::new("bar.txt").exists(), true);
+    /// # Ok(())
+    /// # }
+    /// # fn main() {
+    /// # create_hard_link().unwrap();
+    /// # }
+    /// ```
+    pub fn hard_link<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let original = &self.absolutized()?.path;
+        let link = Filey::new(path).absolutized()?.path;
+        hard_link(original, link).map_err(|e| e.into()).map_err(FileyError)?;
         Ok(())
     }
 
