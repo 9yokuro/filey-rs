@@ -557,7 +557,11 @@ impl Filey {
     }
 
     pub fn exists(&self) -> bool {
-        self.path.exists()
+        if self.path.exists() || self.path.is_symlink() {
+            true
+        } else {
+            false
+        }
     }
 
     pub fn is_file(&self) -> bool {
