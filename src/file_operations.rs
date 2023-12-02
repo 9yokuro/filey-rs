@@ -440,18 +440,22 @@ impl Filey {
     /// # }
     /// ```
     pub fn remove(&self) -> Result<()> {
-        if let Some(filetype) = self.file_type() {
-            if let FileTypes::Directory = filetype {
+        if self.exists() {
+            if let FileTypes::Directory = self.file_type().unwrap_or(FileTypes::File) {
                 remove_dir_all(&self.path)
                     .map_err(|e| e.into())
                     .map_err(FileyError)?
             } else {
                 remove_file(&self.path)
                     .map_err(|e| e.into())
-                    .map_err(FileyError)?
+                    .map_err(FileyError)?;
             }
+            Ok(())
+        } else {
+            Err(NotFound {
+                path: self.to_string(),
+            })
         }
-        Ok(())
     }
 
     /// Create a new file or directory.
