@@ -1,17 +1,17 @@
 use crate::{
     file_types::FileTypes,
     unit_of_information::UnitOfInfo,
-    Error::{AlreadyExists, FileyError, NotADirectory, SameNameAlreadyExists},
+    Error::{AlreadyExists, FileyError, NotADirectory, NotFound},
     Result,
 };
 use path_absolutize::Absolutize;
 use std::{
-    env::var,
     convert::AsRef,
+    env::var,
     fmt,
     fs::{
-        copy, create_dir_all, metadata, read_dir, remove_dir_all, remove_file, rename, File,
-        OpenOptions, hard_link,
+        copy, create_dir_all, hard_link, metadata, read_dir, remove_dir_all, remove_file, rename,
+        File, OpenOptions,
     },
     io::{self, BufWriter, Write},
     os::unix::fs::symlink,
@@ -32,7 +32,7 @@ impl fmt::Display for Filey {
 
 impl AsRef<Path> for Filey {
     fn as_ref(&self) -> &Path {
-        let path: &Path = &self.path.as_ref();
+        let path: &Path = self.path.as_ref();
         path
     }
 }
@@ -70,12 +70,10 @@ impl Filey {
     }
 
     /// Returns type of the file.
-    ///
-    /// # Errors
-    /// * The file doesn't exist.
-    pub fn file_type(&self) -> Result<FileTypes> {
+    /// If the path doesn't exist, return None.
+    pub fn file_type(&self) -> Option<FileTypes> {
         let file_type = FileTypes::which(&self.path)?;
-        Ok(file_type)
+        Some(file_type)
     }
 
     /// Returns size of the file.
@@ -100,7 +98,10 @@ impl Filey {
     /// # }
     /// ```
     pub fn size(&self) -> Result<u64> {
-        if self.file_type()? == FileTypes::Directory {
+        if self.file_type().ok_or_else(|| NotFound {
+            path: self.to_string(),
+        })? == FileTypes::Directory
+        {
             let number_of_files = self.list()?.len();
             Ok(number_of_files as u64)
         } else {
@@ -134,7 +135,10 @@ impl Filey {
     /// # }
     /// ```
     pub fn size_styled(&self) -> Result<String> {
-        if self.file_type()? == FileTypes::Directory {
+        if self.file_type().ok_or_else(|| NotFound {
+            path: self.to_string(),
+        })? == FileTypes::Directory
+        {
             let number_of_files = self.list()?.len();
             Ok(number_of_files.to_string())
         } else {
@@ -381,42 +385,40 @@ impl Filey {
     /// # }
     /// ```
     pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<Self> {
-        if path.as_ref().exists() {
-            if let FileTypes::Directory = FileTypes::which(&path)? {
-                let p = path.as_ref().display().to_string();
-                let to = format!(
-                    "{}/{}",
-                    p,
-                    self.file_name().unwrap_or_else(|| self.to_string())
-                );
-                if Path::new(&to).exists() {
-                    Err(SameNameAlreadyExists { path: to })
+        match FileTypes::which(&path) {
+            Some(filetypes) => {
+                if let FileTypes::Directory = filetypes {
+                    let to = format!(
+                        "{}/{}",
+                        path.as_ref().display(),
+                        self.file_name().unwrap_or_else(|| self.to_string())
+                    );
+                    if Path::new(&to).exists() {
+                        Err(AlreadyExists { path: to })
+                    } else {
+                        rename(&self.path, &to)
+                            .map_err(|e| e.into())
+                            .map_err(FileyError)?;
+                        let filey = Filey::new(&path);
+                        Ok(filey)
+                    }
                 } else {
-                    rename(&self.path, &to)
-                        .map_err(|e| e.into())
-                        .map_err(FileyError)?;
-                    let filey = Filey::new(&to);
-                    Ok(filey)
+                    Err(AlreadyExists {
+                        path: path.as_ref().display().to_string(),
+                    })
                 }
-            } else {
-                Err(AlreadyExists {
-                    path: path.as_ref().display().to_string(),
-                })
             }
-        } else if path.as_ref().exists() {
-            Err(SameNameAlreadyExists {
-                path: path.as_ref().display().to_string(),
-            })
-        } else {
-            rename(&self.path, &path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?;
-            let filey = Filey::new(&path);
-            Ok(filey)
+            None => {
+                rename(&self.path, &path)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?;
+                let filey = Filey::new(&path);
+                Ok(filey)
+            }
         }
     }
 
-    /// Judge the type of a file and remove the file.
+    /// Detects the type of a file and remove the file.
     ///
     /// # Errors
     /// * The file doesn't exist.
@@ -438,15 +440,22 @@ impl Filey {
     /// # }
     /// ```
     pub fn remove(&self) -> Result<()> {
-        match self.file_type()? {
-            FileTypes::Directory => remove_dir_all(&self.path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?,
-            _ => remove_file(&self.path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?,
+        if let Some(filetype) = self.file_type() {
+            if let FileTypes::Directory = filetype {
+                remove_dir_all(&self.path)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?
+            } else {
+                remove_file(&self.path)
+                    .map_err(|e| e.into())
+                    .map_err(FileyError)?
+            }
+            Ok(())
+        } else {
+            Err(NotFound {
+                path: self.to_string(),
+            })
         }
-        Ok(())
     }
 
     /// Create a new file or directory.
@@ -541,7 +550,9 @@ impl Filey {
     pub fn hard_link<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let original = &self.absolutized()?.path;
         let link = Filey::new(path).absolutized()?.path;
-        hard_link(original, link).map_err(|e| e.into()).map_err(FileyError)?;
+        hard_link(original, link)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
         Ok(())
     }
 
@@ -590,11 +601,8 @@ impl Filey {
     /// # }
     /// ```
     pub fn list(&self) -> Result<Vec<PathBuf>> {
-        if self.file_type()? != FileTypes::Directory {
-            Err(NotADirectory {
-                path: self.path.to_string_lossy().to_string(),
-            })?
-        } else {
+        if let Some(filetype) = self.file_type() {
+            if let FileTypes::Directory = filetype {
             let mut v = vec![];
             for i in read_dir(&self.path)
                 .map_err(|e| e.into())
@@ -604,6 +612,11 @@ impl Filey {
                 v.push(p)
             }
             Ok(v)
+            } else {
+                Err(NotADirectory { path: self.to_string() })
+            }
+        } else {
+            Err(NotFound { path: self.to_string() })
         }
     }
 }

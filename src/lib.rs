@@ -59,10 +59,6 @@ pub enum Error {
     AlreadyExists {
         path: String,
     },
-    #[error("'{}' file with the same name already exists", path)]
-    SameNameAlreadyExists {
-        path: String,
-    },
 }
 
 pub type Result<T> = std::result::Result<T, crate::Error>;

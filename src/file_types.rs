@@ -1,4 +1,3 @@
-use crate::Error::NotFound;
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path};
 
@@ -21,42 +20,37 @@ impl fmt::Display for FileTypes {
 }
 
 impl FileTypes {
-    /// Judge the type of a file.
-    ///
-    /// # Errors
-    /// * The file doesn't exist.
+    /// Detect the type of a file.
+    /// If the file doesn't exist, return None.
     ///
     /// # Examples
     /// ```
     /// # use filey::FileTypes;
-    /// # use std::error::Error;
     /// #
-    /// # fn kind() -> Result<(), Box<Error>> {
+    /// # fn kind() -> Option<()> {
     /// let file = "src/lib.rs";
     /// println!(FileTypes::which(file)?); // file
     ///
     /// let directory = "src";
     /// println!(FileTypes::which(directory)?); // directory
-    /// # Ok(())
+    /// # Some(())
     /// # }
     /// # fn main() {
     /// # kind().unwrap();
     /// # }
     /// ```
-    pub fn which<P: AsRef<Path>>(path: P) -> crate::Result<Self> {
+    pub fn which<P: AsRef<Path>>(path: P) -> Option<Self> {
         let p: &Path = path.as_ref();
         if p.exists() {
             if p.is_dir() {
-                Ok(Self::Directory)
+                Some(Self::Directory)
             } else if p.is_symlink() {
-                Ok(Self::Symlink)
+                Some(Self::Symlink)
             } else {
-                Ok(Self::File)
+                Some(Self::File)
             }
         } else {
-            Err(NotFound {
-                path: path.as_ref().display().to_string(),
-            })?
+            None
         }
     }
 }
