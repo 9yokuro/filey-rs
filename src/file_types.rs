@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path};
 
-/// Kinds of files.
-#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub enum FileTypes {
     File,
     Directory,
@@ -20,8 +19,8 @@ impl fmt::Display for FileTypes {
 }
 
 impl FileTypes {
-    /// Detect the type of a file.
-    /// If the file doesn't exist, return None.
+    /// Detects the type of a file.
+    /// If the file doesn't exist, returns None.
     ///
     /// # Examples
     /// ```

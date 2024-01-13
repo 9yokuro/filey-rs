@@ -4,7 +4,6 @@
 //! This library is made up of three main components:
 //!
 //! - [`Filey`]: the main struct.
-//! - [`UnitOfInfo`]: make unit convertion easier.
 //! - [`FileTypes`]: make treating file types easier.
 //!
 //! # A Basic example
@@ -15,12 +14,9 @@
 //! # fn examples() -> Result<(), Box<Error>> {
 //! use filey::{Filey, FileTypes};
 //!
-//! // Create a new file.
-//! let file = Filey::new(".great_app.conf").create(FileTypes::File)?;
-//!
-//! // Two months later...
-//! let file_size = file.size_styled()?;
-//! println!("{}", file_size); // 17MiB
+//! let mut file = Filey::new(".great_app.conf").create(FileTypes::File)?;
+//! let file_size = file.size()?;
+//! println!("{}", file_size); // 0
 //!
 //! let dotfile = file.move_to("dotfiles/")?;
 //!
@@ -32,31 +28,31 @@
 //! # }
 //! ```
 
-mod file_operations;
 mod file_types;
+mod filey;
 mod macros;
 mod test;
-mod unit_of_information;
 
-pub use crate::{
-    file_operations::Filey, file_types::FileTypes, macros::*, unit_of_information::UnitOfInfo,
-};
+pub use crate::{file_types::FileTypes, filey::Filey, macros::*};
 
-/// Filey's error type.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub enum Error {
     FileyError(anyhow::Error),
     #[error("'{}' No such file or directory", path)]
-    NotFound {
+    NotFoundError {
         path: String,
     },
     #[error("'{}' is not a directory", path)]
-    NotADirectory {
+    NotADirectoryError {
         path: String,
     },
     #[error("'{}' already exists", path)]
-    AlreadyExists {
+    AlreadyExistsError {
+        path: String,
+    },
+    #[error("Could not get the name of '{}'", path)]
+    GetFileNameError {
         path: String,
     },
 }

@@ -1,25 +1,23 @@
 use crate::{
     file_types::FileTypes,
-    unit_of_information::UnitOfInfo,
-    Error::{AlreadyExists, FileyError, NotADirectory, NotFound},
+    Error::{AlreadyExistsError, FileyError, GetFileNameError, NotADirectoryError, NotFoundError},
     Result,
 };
 use path_absolutize::Absolutize;
+use serde::{Deserialize, Serialize};
 use std::{
     convert::AsRef,
     env::var,
     fmt,
     fs::{
         copy, create_dir_all, hard_link, metadata, read_dir, remove_dir_all, remove_file, rename,
-        File, OpenOptions,
+        File,
     },
-    io::{self, BufWriter, Write},
     os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
 
-/// The main struct.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct Filey {
     path: PathBuf,
 }
@@ -37,25 +35,6 @@ impl AsRef<Path> for Filey {
     }
 }
 
-impl Write for Filey {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let f = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&self.path)?;
-        let mut writer = BufWriter::new(f);
-        let n = writer.write(buf)?;
-        Ok(n)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        let f = OpenOptions::new().write(true).open(&self.path)?;
-        let mut writer = BufWriter::new(f);
-        writer.flush()?;
-        Ok(())
-    }
-}
-
 impl Filey {
     /// Constructs a new Filey.
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
@@ -69,11 +48,10 @@ impl Filey {
         &self.path
     }
 
-    /// Returns type of the file.
+    /// Returns the type of the file.
     /// If the path doesn't exist, return None.
     pub fn file_type(&self) -> Option<FileTypes> {
-        let file_type = FileTypes::which(&self.path)?;
-        Some(file_type)
+        FileTypes::which(&self.path)
     }
 
     /// Returns size of the file.
@@ -97,53 +75,17 @@ impl Filey {
     /// # get_size().unwrap();
     /// # }
     /// ```
-    pub fn size(&self) -> Result<u64> {
-        if self.file_type().ok_or_else(|| NotFound {
+    pub fn size(&self) -> Result<usize> {
+        if self.file_type().ok_or_else(|| NotFoundError {
             path: self.to_string(),
         })? == FileTypes::Directory
         {
-            let number_of_files = self.list()?.len();
-            Ok(number_of_files as u64)
+            Ok(self.list()?.len())
         } else {
-            let size = metadata(&self.path)
+            Ok(metadata(&self.path)
                 .map_err(|e| e.into())
                 .map_err(FileyError)?
-                .len();
-            Ok(size)
-        }
-    }
-
-    /// Return size of the file with a unit.
-    /// If path points to a directory, return the number of files in the directory.
-    ///
-    /// # Errors
-    /// * The user lacks permissions.
-    /// * The file doesn't exist.
-    ///
-    /// # Examples
-    /// ```
-    /// # use filey::Filey;
-    /// # std::error::Error;
-    /// #
-    /// # fn get_size_styled() -> Result<(), Box<Error>> {
-    /// let size_styled = Filey::new("great.rs").size_styled()?;
-    /// println!("{}", size_styled); // 20GiB
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// # get_size_styled().unwrap();
-    /// # }
-    /// ```
-    pub fn size_styled(&self) -> Result<String> {
-        if self.file_type().ok_or_else(|| NotFound {
-            path: self.to_string(),
-        })? == FileTypes::Directory
-        {
-            let number_of_files = self.list()?.len();
-            Ok(number_of_files.to_string())
-        } else {
-            let n = self.size()?;
-            Ok(UnitOfInfo::format(n))
+                .len() as usize)
         }
     }
 
@@ -167,8 +109,7 @@ impl Filey {
     /// # }
     /// ```
     pub fn file_name(&self) -> Option<String> {
-        let name = self.path.file_name()?.to_string_lossy().to_string();
-        Some(name)
+        Some(self.path.file_name()?.to_string_lossy().to_string())
     }
 
     /// Returns the stem portion of the file name.
@@ -189,8 +130,7 @@ impl Filey {
     /// # }
     /// ```
     pub fn file_stem(&self) -> Option<String> {
-        let stem = self.path.file_stem()?.to_string_lossy().to_string();
-        Some(stem)
+        Some(self.path.file_stem()?.to_string_lossy().to_string())
     }
 
     /// Returns the parent directory.
@@ -202,26 +142,21 @@ impl Filey {
     /// #
     /// # fn get_parent_dir() -> Option<PathBuf> {
     /// let file = Filey::new("src/lib.rs");
-    /// assert_eq!(file.parent_dir()?
-    ///     .to_string_lossy()
-    ///     .to_string()
-    ///     .as_str(),
-    ///     "src");
+    /// assert_eq!(file.parent_dir()?.as_str(), "src");
     /// # Some(file.path())
     /// # }
     /// # fn main() {
     /// # get_parent_dir().unwrap();
     /// # }
     /// ```
-    pub fn parent_dir(&self) -> Option<PathBuf> {
-        let parent_dir = self.path.parent()?.to_path_buf();
-        Some(parent_dir)
+    pub fn parent_dir(&self) -> Option<String> {
+        Some(self.path.parent()?.to_string_lossy().to_string())
     }
 
     /// Returns the absolutized path of the file or the directory.
     ///
     /// # Errors
-    /// * The environment variable isn't set.
+    /// * The environment variable HOME isn't set.
     /// * The environment variable's name contains the equal sign character (=) or the NUL
     /// character.
     /// * The environment variable's value is not valid Unicode.
@@ -232,7 +167,7 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn get_absoluzed() -> Result<(), Box<Error>> {
-    /// let file = Filey::new("src/lib.rs");
+    /// let mut file = Filey::new("src/lib.rs");
     /// assert_eq!(file.absolutized()?
     ///     .to_string()
     ///     .as_str(),
@@ -243,16 +178,15 @@ impl Filey {
     /// # get_absoluzed().unwrap();
     /// # }
     /// ```
-    pub fn absolutized(&self) -> Result<Self> {
-        let path = self
+    pub fn absolutized(&mut self) -> Result<&mut Self> {
+        self.path = self
             .expand_user()?
             .path
             .absolutize()
             .map_err(|e| e.into())
             .map_err(FileyError)?
             .to_path_buf();
-        let filey = Filey::new(path);
-        Ok(filey)
+        Ok(self)
     }
 
     /// Return the canonicalized(absolutized and symbolic links solved) path.
@@ -268,7 +202,7 @@ impl Filey {
     /// #
     /// # fn get_canonicalized() -> Result<(), Box<Error>> {
     /// // nvim/init.lua -> /home/Lisa/dotfiles/nvim/init.lua
-    /// let file = Filey::new("nvim/init.lua");
+    /// let mut file = Filey::new("nvim/init.lua");
     /// assert_eq!(file.canonicalized()?
     ///     .to_string()
     ///     .as_str(),
@@ -279,20 +213,19 @@ impl Filey {
     /// # get_canonicalized().unwrap();
     /// # }
     /// ```
-    pub fn canonicalized(&self) -> Result<Self> {
-        let path = self
+    pub fn canonicalized(&mut self) -> Result<&mut Self> {
+        self.path = self
             .path
             .canonicalize()
             .map_err(|e| e.into())
             .map_err(FileyError)?;
-        let filey = Filey::new(path);
-        Ok(filey)
+        Ok(self)
     }
 
     /// Replaces an initial tilde of the path by the environment variable HOME.
     ///
     /// # Errors
-    /// * The environment variable isn't set.
+    /// * The environment variable HOME isn't set.
     /// * The environment variable's name contains the equal sign character (=) or the NUL
     /// character.
     /// * The environment variable's value is not valid Unicode.
@@ -303,7 +236,7 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn get_expanded() -> Result<(), Box<Error>> {
-    /// let directory = Filey::new("~/audio");
+    /// let mut directory = Filey::new("~/audio");
     /// assert_eq!(directory.expand_user()?
     ///     .to_string()
     ///     .as_str(),
@@ -314,22 +247,18 @@ impl Filey {
     /// # get_expanded().unwrap();
     /// # }
     /// ```
-    pub fn expand_user(&self) -> Result<Self> {
-        let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
-        let s = &self.path.to_string_lossy().to_string();
+    pub fn expand_user(&mut self) -> Result<&mut Self> {
+        let s = &self.to_string();
         if s.starts_with('~') {
-            let p = s.replacen('~', &home_dir, 1);
-            let filey = Filey::new(p);
-            Ok(filey)
-        } else {
-            Ok(self.clone())
+            self.path = Path::new(&s.replacen('~', &home_dir()?, 1)).to_path_buf();
         }
+        Ok(self)
     }
 
     /// Replaces path_to_home by tilde.
     ///
     /// # Errors
-    /// * The environment variable isn't set.
+    /// * The environment variable HOME isn't set.
     /// * The environment variable's name contains the equal sign character (=) or the NUL
     /// character.
     /// * The environment variable's value is not valid Unicode.
@@ -340,7 +269,7 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn get_closed() -> Result<(), Box<Error>> {
-    /// let file = Filey::new("/home/Meg/cats.png");
+    /// let mut file = Filey::new("/home/Meg/cats.png");
     /// assert_eq!(file.close_user()?.as_str(), "~/cats.png")
     /// # Ok(())
     /// # }
@@ -348,15 +277,13 @@ impl Filey {
     /// # get_closed().unwrap();
     /// # }
     /// ```
-    pub fn close_user(&self) -> Result<String> {
-        let home_dir = var("HOME").map_err(|e| e.into()).map_err(FileyError)?;
-        let s = self.path.to_string_lossy().to_string();
+    pub fn close_user(&mut self) -> Result<&mut Self> {
+        let home_dir = home_dir()?;
+        let s = self.to_string();
         if s.starts_with(&home_dir) {
-            let p = s.replacen(&home_dir, "~", 1);
-            Ok(p)
-        } else {
-            Ok(s)
+            self.path = Path::new(&s.replacen(&home_dir, "~", 1)).to_path_buf();
         }
+        Ok(self)
     }
 
     /// Move a file or a directory to the given path.
@@ -375,7 +302,7 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn moves() -> Result<(), Box<Error>> {
-    /// let file = Filey::new("cats.png");
+    /// let mut file = Filey::new("cats.png");
     /// file.move_to("photos/animals/")?;
     /// assert_eq!(Path::new("photos/animals/cats.png").exists(), true);
     /// # Ok(())
@@ -384,26 +311,28 @@ impl Filey {
     /// # moves().unwrap();
     /// # }
     /// ```
-    pub fn move_to<P: AsRef<Path>>(&self, path: P) -> Result<Self> {
+    pub fn move_to<P: AsRef<Path>>(&mut self, path: P) -> Result<&mut Self> {
         match FileTypes::which(&path) {
             Some(filetypes) => {
                 if let FileTypes::Directory = filetypes {
                     let to = format!(
                         "{}/{}",
                         path.as_ref().display(),
-                        self.file_name().unwrap_or_else(|| self.to_string())
+                        self.file_name().ok_or_else(|| GetFileNameError {
+                            path: self.to_string()
+                        })?
                     );
                     if Path::new(&to).exists() {
-                        Err(AlreadyExists { path: to })
+                        Err(AlreadyExistsError { path: to })
                     } else {
                         rename(&self.path, &to)
                             .map_err(|e| e.into())
                             .map_err(FileyError)?;
-                        let filey = Filey::new(&path);
-                        Ok(filey)
+                        self.path = Path::new(&to).to_path_buf();
+                        Ok(self)
                     }
                 } else {
-                    Err(AlreadyExists {
+                    Err(AlreadyExistsError {
                         path: path.as_ref().display().to_string(),
                     })
                 }
@@ -412,8 +341,8 @@ impl Filey {
                 rename(&self.path, &path)
                     .map_err(|e| e.into())
                     .map_err(FileyError)?;
-                let filey = Filey::new(&path);
-                Ok(filey)
+                self.path = path.as_ref().to_path_buf();
+                Ok(self)
             }
         }
     }
@@ -452,7 +381,7 @@ impl Filey {
             }
             Ok(())
         } else {
-            Err(NotFound {
+            Err(NotFoundError {
                 path: self.to_string(),
             })
         }
@@ -474,7 +403,7 @@ impl Filey {
     /// # touch().unwrap();
     /// # }
     /// ```
-    pub fn create(&self, file_type: FileTypes) -> Result<Self> {
+    pub fn create(&self, file_type: FileTypes) -> Result<&Self> {
         match file_type {
             FileTypes::File => {
                 File::create(&self.path)
@@ -486,7 +415,7 @@ impl Filey {
                 .map_err(FileyError)?,
             FileTypes::Symlink => (),
         }
-        Ok(self.clone())
+        Ok(self)
     }
 
     /// Copy the contents of file to another.
@@ -494,8 +423,7 @@ impl Filey {
         copy(&self.path, &path)
             .map_err(|e| e.into())
             .map_err(FileyError)?;
-        let filey = Filey::new(path);
-        Ok(filey)
+        Ok(Filey::new(path))
     }
 
     /// (Unix only) Create a new symbolic link on the filesystem.
@@ -507,9 +435,9 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn create_symlink() -> Result<(), Box<Error> {
-    /// let vimrc_dotfiles = Filey::new("~/dotfiles/vimrc");
+    /// let mut vimrc_dotfiles = Filey::new("~/dotfiles/vimrc");
     /// vimrc_dotfiles.create(FileTypes::File).symlink("~/.vimrc")?;
-    /// assert_eq!(Path::new("~/.vimrc").exists(), true);
+    /// assert!(Path::new("~/.vimrc").exists());
     /// # Ok(())
     /// # }
     /// # fn main() {
@@ -517,12 +445,16 @@ impl Filey {
     /// # }
     /// ```
     #[cfg(target_family = "unix")]
-    pub fn symlink<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let original = &self.absolutized()?.path;
-        let link = Filey::new(path).absolutized()?.path;
-        symlink(original, link)
-            .map_err(|e| e.into())
-            .map_err(FileyError)?;
+    pub fn symlink<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        symlink(
+            &self.absolutized()?.path,
+            path.as_ref()
+                .absolutize()
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
+        )
+        .map_err(|e| e.into())
+        .map_err(FileyError)?;
         Ok(())
     }
 
@@ -538,7 +470,7 @@ impl Filey {
     /// # use std::error::Error;
     /// #
     /// # fn create_hard_link() -> Result<(), Box<Error> {
-    /// let file = Filey::new("foo.txt");
+    /// let mut file = Filey::new("foo.txt");
     /// file.create(FileTypes::File).hard_link("bar.txt")?;
     /// assert_eq!(Path::new("bar.txt").exists(), true);
     /// # Ok(())
@@ -547,21 +479,21 @@ impl Filey {
     /// # create_hard_link().unwrap();
     /// # }
     /// ```
-    pub fn hard_link<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let original = &self.absolutized()?.path;
-        let link = Filey::new(path).absolutized()?.path;
-        hard_link(original, link)
-            .map_err(|e| e.into())
-            .map_err(FileyError)?;
+    pub fn hard_link<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        hard_link(
+            &self.absolutized()?.path,
+            path.as_ref()
+                .absolutize()
+                .map_err(|e| e.into())
+                .map_err(FileyError)?,
+        )
+        .map_err(|e| e.into())
+        .map_err(FileyError)?;
         Ok(())
     }
 
     pub fn exists(&self) -> bool {
-        if self.path.exists() || self.path.is_symlink() {
-            true
-        } else {
-            false
-        }
+        self.path.exists() || self.path.is_symlink()
     }
 
     pub fn is_file(&self) -> bool {
@@ -576,35 +508,7 @@ impl Filey {
         self.path.is_symlink()
     }
 
-    /// Returns a list of files in the directory.
-    ///
-    /// # Errors
-    /// * path doesn't exists.
-    /// * path is not a directory.
-    /// * The user lacks permissions.
-    ///
-    /// # Examples
-    /// ```
-    /// # use filey::Filey;
-    /// # use std::error::Error;
-    /// # fn ls() -> Result<(), Box<Error>> {
-    /// let v = Filey::new("src/").list()?;
-    /// for i in v {
-    ///     let s = i.to_string_lossy().to_string();
-    ///     println!("{}", s)
-    /// }
-    ///
-    /// // src/main.rs
-    /// // src/ui.rs
-    /// // src/draw.rs
-    /// // src/errors.rs
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// # ls().unwrap();
-    /// # }
-    /// ```
-    pub fn list(&self) -> Result<Vec<PathBuf>> {
+    fn list(&self) -> Result<Vec<String>> {
         if let Some(filetype) = self.file_type() {
             if let FileTypes::Directory = filetype {
                 let mut v = vec![];
@@ -612,19 +516,28 @@ impl Filey {
                     .map_err(|e| e.into())
                     .map_err(FileyError)?
                 {
-                    let p = i.map_err(|e| e.into()).map_err(FileyError)?.path();
+                    let p = i
+                        .map_err(|e| e.into())
+                        .map_err(FileyError)?
+                        .path()
+                        .display()
+                        .to_string();
                     v.push(p)
                 }
                 Ok(v)
             } else {
-                Err(NotADirectory {
+                Err(NotADirectoryError {
                     path: self.to_string(),
                 })
             }
         } else {
-            Err(NotFound {
+            Err(NotFoundError {
                 path: self.to_string(),
             })
         }
     }
+}
+
+fn home_dir() -> Result<String> {
+    var("HOME").map_err(|e| e.into()).map_err(FileyError)
 }
