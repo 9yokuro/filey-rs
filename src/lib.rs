@@ -33,22 +33,14 @@ mod filey;
 mod macros;
 mod test;
 
-pub use crate::{file_types::FileTypes, filey::Filey, macros::*};
+pub use crate::{file_types::FileTypes, filey::Filey};
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub enum Error {
     FileyError(anyhow::Error),
-    #[error("'{}' No such file or directory", path)]
-    NotFoundError {
-        path: String,
-    },
-    #[error("'{}' is not a directory", path)]
-    NotADirectoryError {
-        path: String,
-    },
     #[error("'{}' already exists", path)]
-    AlreadyExistsError {
+    AlreadyExists {
         path: String,
     },
     #[error("Could not get the name of '{}'", path)]
