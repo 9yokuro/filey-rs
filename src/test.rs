@@ -112,10 +112,10 @@ mod tests {
     }
 
     #[test]
-    fn test_absolutized() {
+    fn test_absolutize() {
         assert_eq!(
             Filey::new("test_dir/file_a")
-                .absolutized()
+                .absolutize()
                 .unwrap()
                 .to_string(),
             "/home/p14/code/filey/test_dir/file_a".to_string()
@@ -126,9 +126,9 @@ mod tests {
     fn test_close_user() {
         assert_eq!(
             Filey::new("test_dir/file_a")
-                .absolutized()
+                .absolutize()
                 .unwrap()
-                .close_user()
+                .contract_user()
                 .unwrap()
                 .to_string(),
             "~/code/filey/test_dir/file_a"
@@ -139,9 +139,9 @@ mod tests {
     fn test_expand_user() {
         assert_eq!(
             Filey::new("test_dir/file_a")
-                .absolutized()
+                .absolutize()
                 .unwrap()
-                .close_user()
+                .contract_user()
                 .unwrap()
                 .expand_user()
                 .unwrap()
