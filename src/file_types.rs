@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::Path};
 
-#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Serialize, Deserialize, Hash)]
 pub enum FileTypes {
     File,
     Directory,
@@ -40,6 +40,7 @@ impl FileTypes {
     /// ```
     pub fn which<P: AsRef<Path>>(path: P) -> Option<Self> {
         let p: &Path = path.as_ref();
+
         if p.is_symlink() {
             Some(Self::Symlink)
         } else if p.exists() {

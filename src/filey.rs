@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, PartialOrd, Ord, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct Filey {
     path: PathBuf,
 }
@@ -55,7 +55,6 @@ impl Filey {
     }
 
     /// Returns size of the file.
-    /// If path points to a directory, return the number of files in the directory.
     ///
     /// # Errors
     /// * The user lacks permissions.
@@ -75,18 +74,11 @@ impl Filey {
     /// # get_size().unwrap();
     /// # }
     /// ```
-    pub fn size(&self) -> Result<usize> {
-        if self.file_type().ok_or_else(|| NotFoundError {
-            path: self.to_string(),
-        })? == FileTypes::Directory
-        {
-            Ok(self.list()?.len())
-        } else {
-            Ok(metadata(&self.path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?
-                .len() as usize)
-        }
+    pub fn size(&self) -> Result<u64> {
+        Ok(metadata(&self.path)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?
+            .len())
     }
 
     /// Returns the file name or the directory name.
