@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{create, units::*, FileTypes, Filey};
+    use crate::{create, FileTypes, Filey};
     use std::{
         fs::{create_dir_all, remove_dir_all, File},
         os::unix::fs::symlink,
@@ -118,7 +118,7 @@ mod tests {
                 .absolutize()
                 .unwrap()
                 .to_string(),
-            "/home/p14/code/filey/test_dir/file_a".to_string()
+            "/home/p14/code/filey-rs/test_dir/file_a".to_string()
         );
     }
 
@@ -131,7 +131,7 @@ mod tests {
                 .contract_user()
                 .unwrap()
                 .to_string(),
-            "~/code/filey/test_dir/file_a"
+            "~/code/filey-rs/test_dir/file_a"
         );
     }
 
@@ -146,7 +146,7 @@ mod tests {
                 .expand_user()
                 .unwrap()
                 .to_string(),
-            "/home/p14/code/filey/test_dir/file_a"
+            "/home/p14/code/filey-rs/test_dir/file_a"
         );
     }
 
