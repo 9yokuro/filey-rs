@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{create, file_types::FileTypes, filey::Filey};
+    use crate::{create, units::*, FileTypes, Filey};
     use std::{
         fs::{create_dir_all, remove_dir_all, File},
         os::unix::fs::symlink,
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn test_close_user() {
+    fn test_contract_user() {
         assert_eq!(
             Filey::new("test_dir/file_a")
                 .absolutize()
