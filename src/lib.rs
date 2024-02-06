@@ -32,7 +32,7 @@ mod file_types;
 mod filey;
 mod macros;
 mod test;
-mod units;
+pub mod units;
 
 pub use crate::{file_types::FileTypes, filey::Filey};
 
