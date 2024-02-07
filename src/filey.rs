@@ -1,6 +1,6 @@
 use crate::{
     file_types::FileTypes,
-    Error::{AlreadyExists, FileyError, GetFileNameError},
+    Error::{FileyError, GetFileNameError},
     Permissions, Result,
 };
 use path_absolutize::Absolutize;
@@ -10,6 +10,7 @@ use std::{
     env::var,
     fmt,
     fs::{copy, create_dir_all, hard_link, metadata, remove_dir_all, remove_file, rename, File},
+    io::{Read, Write},
     os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
@@ -29,6 +30,25 @@ impl AsRef<Path> for Filey {
     fn as_ref(&self) -> &Path {
         let path: &Path = self.path.as_ref();
         path
+    }
+}
+
+impl Read for Filey {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut f = File::open(self)?;
+        f.read(buf)
+    }
+}
+
+impl Write for Filey {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut f = File::create(self)?;
+        f.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut f = File::create(self)?;
+        f.flush()
     }
 }
 
@@ -308,38 +328,25 @@ impl Filey {
     /// # }
     /// ```
     pub fn move_to<P: AsRef<Path>>(&mut self, path: P) -> Result<&mut Self> {
-        match FileTypes::which(path.as_ref()) {
-            Some(filetypes) => {
-                if let FileTypes::Directory = filetypes {
-                    let to = format!(
-                        "{}/{}",
-                        path.as_ref().to_string_lossy(),
-                        self.file_name().ok_or_else(|| GetFileNameError {
-                            path: self.to_string()
-                        })?
-                    );
-                    if Path::new(&to).exists() {
-                        Err(AlreadyExists { path: to })
-                    } else {
-                        rename(&self.path, &to)
-                            .map_err(|e| e.into())
-                            .map_err(FileyError)?;
-                        self.path = to.into();
-                        Ok(self)
-                    }
-                } else {
-                    Err(AlreadyExists {
-                        path: path.as_ref().to_string_lossy().to_string(),
-                    })
-                }
-            }
-            None => {
-                rename(&self.path, path.as_ref())
-                    .map_err(|e| e.into())
-                    .map_err(FileyError)?;
-                self.path = path.as_ref().to_path_buf();
-                Ok(self)
-            }
+        let path = path.as_ref();
+
+        if path.is_dir() {
+            let file_name = self.file_name().ok_or_else(|| GetFileNameError {
+                path: self.to_string(),
+            })?;
+            let to = path.to_path_buf().join(file_name);
+
+            rename(&self, &to)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?;
+            self.path = to;
+            Ok(self)
+        } else {
+            rename(&self, path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?;
+            self.path = path.to_path_buf();
+            Ok(self)
         }
     }
 
@@ -377,43 +384,36 @@ impl Filey {
         Ok(())
     }
 
-    /// Create a new file or directory.
-    ///
-    /// # Examples
-    /// ```
-    /// # use filey::{Filey, FileTypes};
-    /// # use std::error::Error;
-    /// #
-    /// # fn touch() -> Result<(), Box<Error> {
-    /// let directory = File::new("photo/dogs").create(FileTypes::Directory)?;
-    /// assert_eq!(directory.exists(), true);
-    /// # Ok(())
-    /// # }
-    /// # fn main() {
-    /// # touch().unwrap();
-    /// # }
-    /// ```
-    pub fn create(&self, file_type: FileTypes) -> Result<&Self> {
-        match file_type {
-            FileTypes::File => {
-                File::create(&self.path)
-                    .map_err(|e| e.into())
-                    .map_err(FileyError)?;
-            }
-            FileTypes::Directory => create_dir_all(&self.path)
-                .map_err(|e| e.into())
-                .map_err(FileyError)?,
-            FileTypes::Symlink => (),
-        }
-        Ok(self)
+    pub fn create_file(&self) -> Result<Self> {
+        File::create(self)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
+        Ok(self.clone())
+    }
+
+    pub fn create_dir(&self) -> Result<Self> {
+        create_dir_all(self)
+            .map_err(|e| e.into())
+            .map_err(FileyError)?;
+        Ok(self.clone())
     }
 
     /// Copy the contents of file to another.
-    pub fn copy<P: AsRef<Path>>(&self, path: P) -> Result<Self> {
-        copy(&self.path, &path)
-            .map_err(|e| e.into())
-            .map_err(FileyError)?;
-        Ok(Filey::new(path))
+    pub fn copy<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let path = path.as_ref();
+
+        if path.is_dir() {
+            let file_name = self.file_name().ok_or_else(|| GetFileNameError {
+                path: self.to_string(),
+            })?;
+            let to = path.to_path_buf().join(file_name);
+
+            copy(self, to).map_err(|e| e.into()).map_err(FileyError)?;
+            Ok(())
+        } else {
+            copy(self, path).map_err(|e| e.into()).map_err(FileyError)?;
+            Ok(())
+        }
     }
 
     /// (Unix only) Create a new symbolic link on the filesystem.
@@ -436,16 +436,23 @@ impl Filey {
     /// ```
     #[cfg(target_family = "unix")]
     pub fn symlink<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        symlink(
-            &self.absolutize()?.path,
-            path.as_ref()
-                .absolutize()
+        let path = path.as_ref();
+
+        if path.is_dir() {
+            let file_name = self.file_name().ok_or_else(|| GetFileNameError {
+                path: self.to_string(),
+            })?;
+            let link = path.to_path_buf().join(file_name);
+            symlink(self, link)
                 .map_err(|e| e.into())
-                .map_err(FileyError)?,
-        )
-        .map_err(|e| e.into())
-        .map_err(FileyError)?;
-        Ok(())
+                .map_err(FileyError)?;
+            Ok(())
+        } else {
+            symlink(self, path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?;
+            Ok(())
+        }
     }
 
     /// Create a new hard link on the filesystem.
@@ -470,16 +477,23 @@ impl Filey {
     /// # }
     /// ```
     pub fn hard_link<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        hard_link(
-            &self.absolutize()?.path,
-            path.as_ref()
-                .absolutize()
+        let path = path.as_ref();
+
+        if path.is_dir() {
+            let file_name = self.file_name().ok_or_else(|| GetFileNameError {
+                path: self.to_string(),
+            })?;
+            let link = path.to_path_buf().join(file_name);
+            hard_link(self, link)
                 .map_err(|e| e.into())
-                .map_err(FileyError)?,
-        )
-        .map_err(|e| e.into())
-        .map_err(FileyError)?;
-        Ok(())
+                .map_err(FileyError)?;
+            Ok(())
+        } else {
+            hard_link(self, path)
+                .map_err(|e| e.into())
+                .map_err(FileyError)?;
+            Ok(())
+        }
     }
 
     pub fn exists(&self) -> bool {

@@ -1,21 +1,36 @@
-/// Creates file(s) or directory(s).
+/// Creates file(s).
 ///
 /// # Examples
 /// ```
-/// # use filey::{Filey, FileTypes, create};
+/// # use filey::{Filey, create_file};
 /// #
-/// create!(FileTypes::File, "src/draw_ui.rs", "src/app_state.rs", "run.rs");
+/// create_file!("src/draw_ui.rs", "src/app_state.rs", "run.rs");
 /// ```
 #[macro_export]
-macro_rules! create {
-    ( $file_type:expr $(, $path:expr )* $(,)?) => {
+macro_rules! create_file {
+    ( $( $path:expr ), *) => {
         {
             $(
                 let f = Filey::new($path);
                 if !f.exists() {
-                    f.create($file_type).unwrap();
+                    f.create_file().unwrap();
                 }
             )*
+        }
+    }
+}
+
+/// Creates directory(s).
+#[macro_export]
+macro_rules! create_dir {
+    ( $( $path:expr ), *) => {
+        {
+            $(
+                let f = Filey::new($path);
+                if !f.exists() {
+                    f.create_dir().unwrap();
+                }
+             )*
         }
     }
 }
