@@ -31,10 +31,12 @@
 mod file_types;
 mod filey;
 mod macros;
+#[cfg(target_family = "unix")]
+mod permissions;
 mod test;
 pub mod units;
 
-pub use crate::{file_types::FileTypes, filey::Filey};
+pub use crate::{file_types::FileTypes, filey::Filey, permissions::Permissions};
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
