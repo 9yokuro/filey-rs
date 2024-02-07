@@ -1,7 +1,8 @@
 use crate::{
     file_types::FileTypes,
+    units::*,
     Error::{AlreadyExists, FileyError, GetFileNameError},
-    Result,
+    Permissions, Result,
 };
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,10 @@ impl Filey {
             .map_err(|e| e.into())
             .map_err(FileyError)?
             .len())
+    }
+
+    pub fn permissions(&self) -> Result<Permissions> {
+        Permissions::from_path(self)
     }
 
     /// Returns the file name or the directory name.
