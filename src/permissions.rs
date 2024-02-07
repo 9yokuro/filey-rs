@@ -2,7 +2,7 @@ use crate::{Error::FileyError, Result};
 use serde::{Deserialize, Serialize};
 use std::{fs::metadata, os::unix::fs::PermissionsExt, path::Path};
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Permission {
     execute: bool,
     write: bool,
@@ -66,7 +66,7 @@ impl Permission {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Permissions {
     user: Permission,
     group: Permission,

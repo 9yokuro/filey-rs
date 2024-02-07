@@ -39,12 +39,12 @@ impl FileTypes {
     /// # }
     /// ```
     pub fn which<P: AsRef<Path>>(path: P) -> Option<Self> {
-        let p: &Path = path.as_ref();
+        let path = path.as_ref();
 
-        if p.is_symlink() {
+        if path.is_symlink() {
             Some(Self::Symlink)
-        } else if p.exists() {
-            if p.is_dir() {
+        } else if path.exists() {
+            if path.is_dir() {
                 Some(Self::Directory)
             } else {
                 Some(Self::File)

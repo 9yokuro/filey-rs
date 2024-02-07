@@ -72,10 +72,11 @@ impl Filey {
     /// # }
     /// ```
     pub fn size(&self) -> Result<u64> {
-        Ok(metadata(&self.path)
+        let metadata = metadata(&self.path)
             .map_err(|e| e.into())
-            .map_err(FileyError)?
-            .len())
+            .map_err(FileyError)?;
+        let size = metadata.len();
+        Ok(size)
     }
 
     pub fn permissions(&self) -> Result<Permissions> {
@@ -172,12 +173,12 @@ impl Filey {
     /// # }
     /// ```
     pub fn absolutize(&mut self) -> Result<&mut Self> {
-        self.path = self
+        let absolutized = self
             .path
             .absolutize()
             .map_err(|e| e.into())
-            .map_err(FileyError)?
-            .to_path_buf();
+            .map_err(FileyError)?;
+        self.path = absolutized.to_path_buf();
         Ok(self)
     }
 
@@ -195,7 +196,7 @@ impl Filey {
     /// # fn get_canonicalized() -> Result<(), Box<Error>> {
     /// // nvim/init.lua -> /home/Lisa/dotfiles/nvim/init.lua
     /// let mut file = Filey::new("nvim/init.lua");
-    /// assert_eq!(file.canonicalized()?
+    /// assert_eq!(file.canonicalize()?
     ///     .to_string()
     ///     .as_str(),
     ///     "/home/Lisa/dotfiles/nvim/init.lua");
@@ -205,12 +206,13 @@ impl Filey {
     /// # get_canonicalized().unwrap();
     /// # }
     /// ```
-    pub fn canonicalized(&mut self) -> Result<&mut Self> {
-        self.path = self
+    pub fn canonicalize(&mut self) -> Result<&mut Self> {
+        let canonicalized = self
             .path
             .canonicalize()
             .map_err(|e| e.into())
             .map_err(FileyError)?;
+        self.path = canonicalized;
         Ok(self)
     }
 
@@ -242,7 +244,8 @@ impl Filey {
     pub fn expand_user(&mut self) -> Result<&mut Self> {
         let s = &self.to_string();
         if s.starts_with('~') {
-            self.path = Path::new(&s.replacen('~', &home_dir()?, 1)).to_path_buf();
+            let expanded = s.replacen('~', &home_dir()?, 1);
+            self.path = Path::new(&expanded).to_path_buf();
         }
         Ok(self)
     }
@@ -270,10 +273,11 @@ impl Filey {
     /// # }
     /// ```
     pub fn contract_user(&mut self) -> Result<&mut Self> {
-        let home_dir = home_dir()?;
+        let home_dir = &home_dir()?;
         let s = self.to_string();
-        if s.starts_with(&home_dir) {
-            self.path = Path::new(&s.replacen(&home_dir, "~", 1)).to_path_buf();
+        if s.starts_with(home_dir) {
+            let contracted = s.replacen(home_dir, "~", 1);
+            self.path = Path::new(&contracted).to_path_buf();
         }
         Ok(self)
     }
@@ -361,12 +365,12 @@ impl Filey {
     /// # }
     /// ```
     pub fn remove(&self) -> Result<()> {
-        if let FileTypes::Directory = self.file_type().unwrap_or(FileTypes::File) {
-            remove_dir_all(&self.path)
+        if self.path.is_dir() {
+            remove_dir_all(&self)
                 .map_err(|e| e.into())
                 .map_err(FileyError)?
         } else {
-            remove_file(&self.path)
+            remove_file(&self)
                 .map_err(|e| e.into())
                 .map_err(FileyError)?;
         }
@@ -479,7 +483,7 @@ impl Filey {
     }
 
     pub fn exists(&self) -> bool {
-        self.path.exists() || self.path.is_symlink()
+        self.path.is_symlink() || self.path.exists()
     }
 
     pub fn is_file(&self) -> bool {
