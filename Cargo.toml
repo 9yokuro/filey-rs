@@ -1,6 +1,6 @@
 [package]
 name = "filey"
-version = "1.2.0"
+version = "1.3.0"
 authors = ["p1486 xzstd099@protonmail.com"]
 description = "A collection of utilities to make file operations more convenient."
 license = "MIT OR Apache-2.0"
