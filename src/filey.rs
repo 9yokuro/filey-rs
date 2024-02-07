@@ -1,6 +1,5 @@
 use crate::{
     file_types::FileTypes,
-    units::*,
     Error::{AlreadyExists, FileyError, GetFileNameError},
     Permissions, Result,
 };
