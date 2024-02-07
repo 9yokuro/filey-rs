@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{create, FileTypes, Filey};
+    use crate::{create_dir, create_file, FileTypes, Filey};
     use std::{
         fs::{create_dir_all, remove_dir_all, File},
         os::unix::fs::symlink,
@@ -49,11 +49,11 @@ mod tests {
     fn test_create_files() {
         init();
         let file_a = Path::new("test_dir/file_a");
-        Filey::new(&file_a).create(FileTypes::File).unwrap();
+        Filey::new(&file_a).create_file().unwrap();
         assert!(file_a.exists() && file_a.is_file());
         let file_b = Path::new("test_dir/file_b");
         let file_c = Path::new("test_dir/file_c");
-        create!(FileTypes::File, &file_b, &file_c);
+        create_file!(&file_b, &file_c);
         assert!(file_b.exists() && file_b.is_file());
         assert!(file_c.exists() && file_c.is_file());
         quit();
@@ -63,11 +63,11 @@ mod tests {
     fn test_create_directories() {
         init();
         let dir_a = Path::new("test_dir/dir_a");
-        Filey::new(&dir_a).create(FileTypes::Directory).unwrap();
+        Filey::new(&dir_a).create_dir().unwrap();
         assert!(dir_a.exists() && dir_a.is_dir());
         let dir_b = Path::new("test_dir/dir_b");
         let dir_c = Path::new("test_dir/dir_c");
-        create!(FileTypes::Directory, &dir_b, &dir_c);
+        create_dir!(&dir_b, &dir_c);
         assert!(dir_b.exists() && dir_b.is_dir());
         assert!(dir_c.exists() && dir_c.is_dir());
         quit();
@@ -189,7 +189,7 @@ mod tests {
     fn test_move() {
         init();
         let mut file_a = Filey::new("test_dir/file_a");
-        file_a.create(FileTypes::File).unwrap();
+        file_a.create_file().unwrap();
         let renamed_file_a = Path::new("test_dir/renamed_file_a");
         file_a.move_to(&renamed_file_a).unwrap();
         assert!(renamed_file_a.exists());
