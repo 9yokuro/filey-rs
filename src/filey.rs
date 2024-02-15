@@ -1,6 +1,6 @@
 use crate::{
     file_types::FileTypes,
-    Error::{FileyError, GetFileNameError},
+    Error::{FileyError, GetFileNameError, AlreadyExists},
     Permissions, Result,
 };
 use path_absolutize::Absolutize;
@@ -373,11 +373,11 @@ impl Filey {
     /// ```
     pub fn remove(&self) -> Result<()> {
         if self.path.is_dir() {
-            remove_dir_all(&self)
+            remove_dir_all(self)
                 .map_err(|e| e.into())
                 .map_err(FileyError)?
         } else {
-            remove_file(&self)
+            remove_file(self)
                 .map_err(|e| e.into())
                 .map_err(FileyError)?;
         }
@@ -385,16 +385,30 @@ impl Filey {
     }
 
     pub fn create_file(&self) -> Result<Self> {
+        if self.exists() {
+            return Err(AlreadyExists {
+                path: self.to_string(),
+            })
+        }
+
         File::create(self)
             .map_err(|e| e.into())
             .map_err(FileyError)?;
+
         Ok(self.clone())
     }
 
     pub fn create_dir(&self) -> Result<Self> {
+        if self.exists() {
+            return Err(AlreadyExists {
+                path: self.to_string(),
+            })
+        }
+
         create_dir_all(self)
             .map_err(|e| e.into())
             .map_err(FileyError)?;
+
         Ok(self.clone())
     }
 

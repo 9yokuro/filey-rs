@@ -8,7 +8,7 @@ cargo add filey
 ```
 Or add the following line to your Cargo.toml:
 ```
-filey = "1.3.0"
+filey = "1.4.0"
 ```
 
 # Examples
